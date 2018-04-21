@@ -1,6 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "MovingPlatform.h"
+#include "Engine.h"
+
 
 AMovingPlatform::AMovingPlatform()
 {
@@ -20,6 +22,11 @@ void AMovingPlatform::BeginPlay()
 		SetReplicates(true);
 		SetReplicateMovement(true);
 	}	
+
+	// Set global actor location to actor location.
+	GlobalStartLocation = GetActorLocation();
+	// Set global target location to the target location.
+	GlobalTargetLocation = GetTransform().TransformPosition(TargetLocation);
 }
 
 void AMovingPlatform::Tick(float DeltaTime) 
@@ -27,13 +34,45 @@ void AMovingPlatform::Tick(float DeltaTime)
 	// Override.
 	Super::Tick(DeltaTime);
 
-	// Check whether this is server or not.
-	if (HasAuthority())
+	if (ActiveTriggers > 0)
 	{
-		// Get actor location.
-		FVector Location = GetActorLocation();
-		// Move the actor.
-		Location += FVector(Speed * DeltaTime, 0, 0);
-		SetActorLocation(Location);
+		// Check whether this is server or not.
+		if (HasAuthority())
+		{
+			// Get actor location.
+			FVector Location = GetActorLocation();
+			// Calculate the direction.
+			float JourneyLength = (GlobalTargetLocation - GlobalStartLocation).Size();
+			float JourneyTravelled = (Location - GlobalStartLocation).Size();
+
+			if (JourneyTravelled >= JourneyLength)
+			{
+				FVector GlobalStartLocationTemp = GlobalStartLocation;
+				GlobalStartLocation = GlobalTargetLocation;
+				GlobalTargetLocation = GlobalStartLocationTemp;
+			}
+
+			FVector Direction = (GlobalTargetLocation - GlobalStartLocation).GetSafeNormal();
+			// Move the actor (static).
+			// Location += FVector(Speed * DeltaTime, 0, 0);
+			// Move the actor (dynamic).
+			Location += Speed * DeltaTime * Direction;
+			SetActorLocation(Location);
+		}
+	}	
+}
+
+void AMovingPlatform::AddActiveTrigger()
+{
+	ActiveTriggers++;
+	UE_LOG(LogTemp, Warning, TEXT("asd: %i"), ActiveTriggers);
+}
+
+void AMovingPlatform::RemoveActiveTrigger()
+{
+	if (ActiveTriggers > 0)
+	{
+		ActiveTriggers--;
+		UE_LOG(LogTemp, Warning, TEXT("asd: %i"), ActiveTriggers);
 	}
 }
